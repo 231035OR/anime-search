@@ -1,0 +1,12 @@
+# React dependencies
+anime/node_modules/
+anime/dist/
+
+# Python venv and __pycache__
+fastapi-api/venv/
+fastapi-api/__pycache__/
+
+# General
+*.log
+.DS_Store
+.env
