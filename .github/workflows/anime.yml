@@ -1,52 +1,59 @@
-
-# .github/workflows/ssh-command-on-ec2.yml
-name: SSH Command on EC2
+# .github/workflows/deploy-on-ec2.yml
+name: Deploy React + FastAPI to EC2
 
 on:
   push:
     branches:
-      - main # mainブランチへのプッシュをトリガー
+      - main # mainブランチへのpushで起動
 
 jobs:
-  run_ssh_command:
-    runs-on: ubuntu-latest # GitHubホステッドランナー (SSHクライアントが利用可能)
+  deploy:
+    runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set up SSH Key and Run Command # ★ここがSSH接続の核心部分
-      env:
-        # GitHub Secretsに保存した情報を環境変数として参照
-        # SSH_PRIVATE_KEY: EC2インスタンスのキーペアの秘密鍵（.pemファイルの中身）
-        # EC2_HOST: EC2インスタンスのパブリックIPアドレスまたはパブリックDNS名
-        # EC2_USER: EC2インスタンスのユーザー名 (例: ec2-user, ubuntuなど)
-        SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-        EC2_HOST: ${{ secrets.EC2_PUBLIC_IP_OR_DNS }}
-        EC2_USER: ec2-user # あなたのEC2のOSに合わせたユーザー名に修正してください (例: ubuntu, centosなど)
-      run: |
-        echo "Attempting SSH connection to ${EC2_USER}@${EC2_HOST}..."
+      - name: Setup SSH and deploy
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          EC2_HOST: ${{ secrets.EC2_PUBLIC_IP_OR_DNS }}
+          EC2_USER: ec2-user # Amazon Linuxなら ec2-user、Ubuntuなら ubuntu に変更
+        run: |
+          echo "Starting SSH deployment..."
 
-        # 1. SSH秘密鍵を一時的にファイルに書き出す
-        # GitHub Actionsの実行環境はジョブ終了後に破棄されるため、安全に秘密鍵を扱えます
-        mkdir -p ~/.ssh
-        echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa_ec2
-        chmod 600 ~/.ssh/id_rsa_ec2 # 秘密鍵のパーミッションを設定 (必須)
+          # 秘密鍵をセットアップ
+          mkdir -p ~/.ssh
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
 
-        # 2. SSH接続してコマンドを実行
-        # -i: 秘密鍵のパスを指定
-        # -o StrictHostKeyChecking=no: 初回接続時のホスト認証確認をスキップ (CI/CDで必須)
-        # -o UserKnownHostsFile=/dev/null: Known Hostsファイルを使用しない (CI/CDで必須)
-        # コマンドは引用符で囲んで指定します
-        ssh -i ~/.ssh/id_rsa_ec2 \
-            -o StrictHostKeyChecking=no \
-            -o UserKnownHostsFile=/dev/null \
-            ${EC2_USER}@${EC2_HOST} "
-              echo '--- Start multiple commands ---';
-              pwd; # 現在のディレクトリを表示
-              ls -l /tmp; # /tmpディレクトリの内容を一覧表示
-              df -h; # ディスク使用量を表示
-              echo '--- End multiple commands ---';
-            "
+          # SSH 接続してアプリを更新・再起動
+          ssh -i ~/.ssh/id_rsa \
+              -o StrictHostKeyChecking=no \
+              -o UserKnownHostsFile=/dev/null \
+              ${EC2_USER}@${EC2_HOST} "
+                set -e
+                echo '✅ SSH接続成功 - デプロイスクリプト実行中'
 
-        echo "SSH command execution completed."
+                # ディレクトリへ移動（初回は git clone しておいてね）
+                cd ~/anime-search
+
+                # 最新コード取得
+                git pull origin main
+
+                # React アプリのビルド
+                cd anime
+                npm install
+                npm run build
+
+                # FastAPI 側の依存解決
+                cd ../fastapi-api
+                pip install -r requirements.txt
+
+                # FastAPI 再起動（systemd を使用している場合）
+                sudo systemctl restart fastapi-app.service
+
+                echo '🚀 デプロイ完了'
+              "
+
+          echo "✅ GitHub Actions 側の処理完了"
