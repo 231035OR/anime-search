@@ -1,13 +1,15 @@
 from fastapi import FastAPI, Query
+from pydantic import BaseModel
 import httpx
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 app = FastAPI()
 
+# CORS設定（本番環境ではオリジンを限定してください）
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 本番環境では制限する
+    allow_origins=["*"],  
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -27,13 +29,17 @@ async def anime_detail(anime_id: int):
         response = await client.get(f"{JIKAN_API_BASE}/anime/{anime_id}")
     return response.json()
 
-# ✅ 追加：LibreTranslate API を使った翻訳エンドポイント
+# 翻訳用リクエストモデル
+class TranslateRequest(BaseModel):
+    text: str
+    target_lang: str = "ja"
+
 @app.post("/translate")
-async def translate(text: str = Query(...), target_lang: str = Query("ja")):
+async def translate(req: TranslateRequest):
     payload = {
-        "q": text,
+        "q": req.text,
         "source": "en",
-        "target": target_lang,
+        "target": req.target_lang,
         "format": "text"
     }
     async with httpx.AsyncClient() as client:
