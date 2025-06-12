@@ -3,18 +3,27 @@ import { useParams, Link } from "react-router-dom";
 import axios from "axios";
 
 export default function AnimeDetail() {
-  const { id } = useParams();  // ここを mal_id から id に変更
+  const { id } = useParams();
   const [anime, setAnime] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [translatedSynopsis, setTranslatedSynopsis] = useState("");
 
   useEffect(() => {
     const fetchAnimeDetail = async () => {
       setLoading(true);
       setError(null);
       try {
-        const res = await axios.get(`https://api.jikan.moe/v4/anime/${id}`);  // id を使う
+        const res = await axios.get(`https://api.jikan.moe/v4/anime/${id}`);
         setAnime(res.data.data);
+
+        if (res.data.data.synopsis) {
+          // LibreTranslate APIで翻訳
+          const translated = await translateWithLibre(res.data.data.synopsis);
+          setTranslatedSynopsis(translated);
+        } else {
+          setTranslatedSynopsis("情報なし");
+        }
       } catch (e) {
         setError("詳細情報の取得に失敗しました");
       } finally {
@@ -24,6 +33,22 @@ export default function AnimeDetail() {
 
     fetchAnimeDetail();
   }, [id]);
+
+  // LibreTranslate を使った翻訳関数
+  async function translateWithLibre(text) {
+    try {
+      const res = await axios.post("http://localhost:8000/translate", null, {
+        params: {
+          text: text,
+          target_lang: "ja",
+        },
+      });
+      return res.data.translatedText;
+    } catch (e) {
+      console.error("LibreTranslate翻訳エラー:", e.response?.data || e.message || e);
+      return "翻訳できませんでした";
+    }
+  }
 
   if (loading) return <p>読み込み中...</p>;
   if (error) return <p style={{ color: "red" }}>{error}</p>;
@@ -53,73 +78,9 @@ export default function AnimeDetail() {
       </div>
 
       <section className="synopsis-section">
-        <h2>あらすじ</h2>
-        <p>{anime.synopsis || "情報なし"}</p>
+        <h2>あらすじ（日本語訳）</h2>
+        <p>{translatedSynopsis}</p>
       </section>
-
-      <style>{`
-        .anime-detail-container {
-          max-width: 800px;
-          margin: 2rem auto;
-          padding: 1rem;
-          font-family: sans-serif;
-        }
-        .back-link {
-          display: inline-block;
-          margin-bottom: 1rem;
-          text-decoration: none;
-          color: #007bff;
-        }
-        .back-link:hover {
-          text-decoration: underline;
-        }
-        .title {
-          font-size: 2rem;
-          margin-bottom: 1rem;
-          color: #222;
-        }
-        .top-section {
-          display: flex;
-          gap: 1.5rem;
-          flex-wrap: wrap;
-          margin-bottom: 2rem;
-        }
-        .anime-image {
-          max-width: 280px;
-          width: 100%;
-          border-radius: 8px;
-          box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-          object-fit: cover;
-        }
-        .info {
-          flex: 1;
-          min-width: 200px;
-          font-size: 1rem;
-          color: #444;
-        }
-        .info p {
-          margin: 0.3rem 0;
-        }
-        .synopsis-section h2 {
-          font-size: 1.5rem;
-          margin-bottom: 0.5rem;
-          color: #333;
-        }
-        .synopsis-section p {
-          line-height: 1.6;
-          white-space: pre-wrap;
-          color: #555;
-        }
-        @media (max-width: 600px) {
-          .top-section {
-            flex-direction: column;
-            align-items: center;
-          }
-          .info {
-            min-width: auto;
-          }
-        }
-      `}</style>
     </div>
   );
 }
