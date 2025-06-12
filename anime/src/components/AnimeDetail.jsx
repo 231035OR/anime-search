@@ -37,7 +37,7 @@ export default function AnimeDetail() {
   // LibreTranslate を使った翻訳関数
   async function translateWithLibre(text) {
     try {
-      const res = await axios.post("http://localhost:8000/translate", null, {
+      const res = await axios.post("http://54.224.198.246:8000/translate", null, {
         params: {
           text: text,
           target_lang: "ja",
