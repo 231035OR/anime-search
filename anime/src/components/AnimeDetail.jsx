@@ -18,7 +18,6 @@ export default function AnimeDetail() {
         setAnime(res.data.data);
 
         if (res.data.data.synopsis) {
-          // LibreTranslate APIで翻訳
           const translated = await translateWithLibre(res.data.data.synopsis);
           setTranslatedSynopsis(translated);
         } else {
@@ -37,12 +36,16 @@ export default function AnimeDetail() {
   // LibreTranslate を使った翻訳関数
   async function translateWithLibre(text) {
     try {
-      const res = await axios.post("http://54.224.198.246:8000/translate", null, {
-        params: {
+      const res = await axios.post(
+        "http://54.224.198.246:8000/translate",
+        {
           text: text,
           target_lang: "ja",
         },
-      });
+        {
+          headers: { "Content-Type": "application/json" },
+        }
+      );
       return res.data.translatedText;
     } catch (e) {
       console.error("LibreTranslate翻訳エラー:", e.response?.data || e.message || e);
